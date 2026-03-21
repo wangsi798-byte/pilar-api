@@ -6,19 +6,20 @@ const morgan       = require('morgan')
 const connectDB    = require('./config/db')
 const errorHandler = require('./middleware/errorHandler')
 
-// ── Routes ─────────────────────────────────────
+// Routes
 const authRoutes       = require('./routes/auth')
 const anggotaRoutes    = require('./routes/anggota')
 const paketRoutes      = require('./routes/paket')
 const pembayaranRoutes = require('./routes/pembayaran')
 
-// ── Init ───────────────────────────────────────
+// Init
 const app  = express()
 const PORT = process.env.PORT ?? 5000
 
+// Connect to MongoDB
 connectDB()
 
-// ── Middleware ─────────────────────────────────
+// Middleware
 app.use(helmet())
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'))
 app.use(cors({
@@ -27,7 +28,7 @@ app.use(cors({
 }))
 app.use(express.json())
 
-// ── Health check ───────────────────────────────
+// Health check
 app.get('/health', (_, res) => res.json({
   status: 'ok',
   app: 'pilar-api',
@@ -35,21 +36,26 @@ app.get('/health', (_, res) => res.json({
   time: new Date().toISOString(),
 }))
 
-// ── API Routes ─────────────────────────────────
+// API Routes
 app.use('/api/auth',        authRoutes)
 app.use('/api/anggota',     anggotaRoutes)
 app.use('/api/paket',       paketRoutes)
 app.use('/api/pembayaran',  pembayaranRoutes)
 
-// ── 404 ────────────────────────────────────────
+// 404
 app.use((req, res) => {
   res.status(404).json({ success: false, message: `Route ${req.originalUrl} tidak ditemukan.` })
 })
 
-// ── Error handler ──────────────────────────────
+// Error handler
 app.use(errorHandler)
 
-// ── Listen ─────────────────────────────────────
-app.listen(PORT, () => {
-  console.log(`🚀 Pilar API berjalan di port ${PORT}  [${process.env.NODE_ENV ?? 'development'}]`)
-})
+// For Vercel serverless
+if (process.env.NODE_ENV !== 'production') {
+  app.listen(PORT, () => {
+    console.log(`🚀 Pilar API berjalan di port ${PORT}  [${process.env.NODE_ENV ?? 'development'}]`)
+  })
+}
+
+// Export for Vercel
+module.exports = app
