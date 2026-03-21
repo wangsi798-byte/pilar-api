@@ -16,10 +16,7 @@ const pembayaranRoutes = require('./routes/pembayaran')
 const app  = express()
 const PORT = process.env.PORT ?? 5000
 
-// Connect to MongoDB
-connectDB()
-
-// Middleware
+// Middleware (tanpa connectDB dulu)
 app.use(helmet())
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'))
 app.use(cors({
@@ -29,12 +26,29 @@ app.use(cors({
 app.use(express.json())
 
 // Health check
-app.get('/health', (_, res) => res.json({
-  status: 'ok',
-  app: 'pilar-api',
-  env: process.env.NODE_ENV,
-  time: new Date().toISOString(),
-}))
+app.get('/health', async (_, res) => {
+  try {
+    // Cek koneksi DB
+    const mongoose = require('mongoose')
+    const dbStatus = mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
+    
+    res.json({
+      status: 'ok',
+      app: 'pilar-api',
+      env: process.env.NODE_ENV,
+      db: dbStatus,
+      time: new Date().toISOString(),
+    })
+  } catch (error) {
+    res.json({
+      status: 'ok',
+      app: 'pilar-api',
+      env: process.env.NODE_ENV,
+      db: 'check failed',
+      time: new Date().toISOString(),
+    })
+  }
+})
 
 // API Routes
 app.use('/api/auth',        authRoutes)
@@ -50,12 +64,38 @@ app.use((req, res) => {
 // Error handler
 app.use(errorHandler)
 
-// For Vercel serverless (hanya jalan di development)
+// Koneksi DB untuk Vercel (dipanggil saat pertama kali request)
+let dbConnected = false
+const ensureDbConnection = async () => {
+  if (!dbConnected) {
+    await connectDB()
+    dbConnected = true
+  }
+}
+
+// Wrapper untuk Vercel
+const handler = async (req, res) => {
+  try {
+    await ensureDbConnection()
+    return app(req, res)
+  } catch (error) {
+    console.error('DB Connection Error:', error)
+    res.status(500).json({ 
+      success: false, 
+      message: 'Database connection failed',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    })
+  }
+}
+
+// Untuk development
 if (process.env.NODE_ENV !== 'production') {
-  app.listen(PORT, () => {
-    console.log(`🚀 Pilar API berjalan di port ${PORT}  [${process.env.NODE_ENV ?? 'development'}]`)
+  connectDB().then(() => {
+    app.listen(PORT, () => {
+      console.log(`🚀 Pilar API berjalan di port ${PORT}  [${process.env.NODE_ENV ?? 'development'}]`)
+    })
   })
 }
 
 // Export untuk Vercel
-module.exports = app
+module.exports = handler
