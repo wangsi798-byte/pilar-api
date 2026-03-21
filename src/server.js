@@ -50,12 +50,12 @@ app.use((req, res) => {
 // Error handler
 app.use(errorHandler)
 
-// For Vercel serverless
+// For Vercel serverless (hanya jalan di development)
 if (process.env.NODE_ENV !== 'production') {
   app.listen(PORT, () => {
     console.log(`🚀 Pilar API berjalan di port ${PORT}  [${process.env.NODE_ENV ?? 'development'}]`)
   })
 }
 
-// Export for Vercel
+// Export untuk Vercel
 module.exports = app
