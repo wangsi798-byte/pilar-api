@@ -7,7 +7,8 @@ async function connectDB() {
 
   try {
     const conn = await mongoose.connect(process.env.MONGODB_URI, {
-      serverSelectionTimeoutMS: 5000,
+      serverSelectionTimeoutMS: 30000, // Tingkatkan ke 30 detik untuk Vercel
+      connectTimeoutMS: 30000,
     })
     isConnected = true
     console.log(`✅ MongoDB terhubung: ${conn.connection.host}`)
