@@ -72,14 +72,20 @@ const ensureDbConnection = async () => {
 // Handler untuk Vercel
 module.exports = async (req, res) => {
   try {
+    if (!process.env.MONGODB_URI) {
+      return res.status(500).json({
+        success: false,
+        message: 'Konfigurasi MONGODB_URI belum diset di Vercel.',
+      })
+    }
     await ensureDbConnection()
     await app(req, res)
   } catch (error) {
     console.error('Error:', error)
     res.status(500).json({ 
       success: false, 
-      message: 'Server error',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      message: 'Server error: ' + error.message,
+      error: error.stack
     })
   }
 }
