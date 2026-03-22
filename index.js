@@ -30,6 +30,14 @@ app.use(cors({
 app.use(express.json())
 
 // Health check
+app.get('/', (_, res) => {
+  res.json({
+    status: 'ok',
+    message: 'Pilar API is running',
+    app: 'pilar-api'
+  })
+})
+
 app.get('/health', (_, res) => {
   res.json({
     status: 'ok',
