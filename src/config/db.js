@@ -13,7 +13,8 @@ async function connectDB() {
     console.log(`✅ MongoDB terhubung: ${conn.connection.host}`)
   } catch (err) {
     console.error('❌ Gagal konek MongoDB:', err.message)
-    process.exit(1)
+    // Jangan gunakan process.exit(1) di Vercel karena akan mematikan serverless function
+    throw err
   }
 }
 
