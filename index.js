@@ -15,21 +15,20 @@ const pembayaranRoutes = require('./src/routes/pembayaran')
 const app = express()
 
 // Middleware
-app.use(helmet())
-app.use(morgan('dev'))
-const allowedOrigins = [
-  process.env.CLIENT_URL,
-  'https://pilar2.vercel.app',
-  'http://localhost:3000'
-].filter(Boolean);
-
+// CORS harus di paling atas agar preflight OPTIONS request tidak terblokir
 app.use(cors({
   origin: true,
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+  exposedHeaders: ['Content-Range', 'X-Content-Range'],
 }))
+
+app.use(helmet())
+app.use(morgan('dev'))
 app.use(express.json())
 
-// Health check
+// Health check (Tanpa perlu koneksi DB)
 app.get('/', (_, res) => {
   res.json({
     status: 'ok',
@@ -47,45 +46,50 @@ app.get('/health', (_, res) => {
   })
 })
 
+// Middleware koneksi DB untuk semua route API
+let dbConnected = false
+app.use(async (req, res, next) => {
+  // Lewati koneksi DB untuk request OPTIONS (preflight) agar cepat
+  if (req.method === 'OPTIONS') {
+    return next()
+  }
+
+  if (!dbConnected) {
+    try {
+      if (!process.env.MONGODB_URI) {
+        return res.status(500).json({
+          success: false,
+          message: 'Konfigurasi MONGODB_URI belum diset.',
+        })
+      }
+      await connectDB()
+      dbConnected = true
+      next()
+    } catch (error) {
+      console.error('Database connection error:', error)
+      res.status(500).json({
+        success: false,
+        message: 'Gagal terhubung ke database: ' + error.message,
+      })
+    }
+  } else {
+    next()
+  }
+})
+
 // API Routes
 app.use('/api/auth', authRoutes)
 app.use('/api/anggota', anggotaRoutes)
 app.use('/api/paket', paketRoutes)
 app.use('/api/pembayaran', pembayaranRoutes)
 
-// 404
+// 404 handler (Hanya untuk route yang tidak terdaftar)
 app.use((req, res) => {
   res.status(404).json({ success: false, message: `Route ${req.originalUrl} tidak ditemukan.` })
 })
 
+// Error handler
 app.use(errorHandler)
 
-// Koneksi DB
-let dbConnected = false
-const ensureDbConnection = async () => {
-  if (!dbConnected) {
-    await connectDB()
-    dbConnected = true
-  }
-}
-
-// Handler untuk Vercel
-module.exports = async (req, res) => {
-  try {
-    if (!process.env.MONGODB_URI) {
-      return res.status(500).json({
-        success: false,
-        message: 'Konfigurasi MONGODB_URI belum diset di Vercel.',
-      })
-    }
-    await ensureDbConnection()
-    await app(req, res)
-  } catch (error) {
-    console.error('Error:', error)
-    res.status(500).json({ 
-      success: false, 
-      message: 'Server error: ' + error.message,
-      error: error.stack
-    })
-  }
-}
+// Export app untuk Vercel
+module.exports = app
