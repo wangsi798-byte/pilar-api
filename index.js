@@ -3,14 +3,14 @@ const express = require('express')
 const cors = require('cors')
 const helmet = require('helmet')
 const morgan = require('morgan')
-const connectDB = require('../src/config/db')
-const errorHandler = require('../src/middleware/errorHandler')
+const connectDB = require('./src/config/db')
+const errorHandler = require('./src/middleware/errorHandler')
 
 // Routes
-const authRoutes = require('../src/routes/auth')
-const anggotaRoutes = require('../src/routes/anggota')
-const paketRoutes = require('../src/routes/paket')
-const pembayaranRoutes = require('../src/routes/pembayaran')
+const authRoutes = require('./src/routes/auth')
+const anggotaRoutes = require('./src/routes/anggota')
+const paketRoutes = require('./src/routes/paket')
+const pembayaranRoutes = require('./src/routes/pembayaran')
 
 const app = express()
 
