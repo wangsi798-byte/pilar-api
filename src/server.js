@@ -5,17 +5,15 @@ const helmet       = require('helmet')
 const morgan       = require('morgan')
 const connectDB    = require('./config/db')
 const errorHandler = require('./middleware/errorHandler')
-
 // Routes
-const authRoutes       = require('./routes/auth')
-const anggotaRoutes    = require('./routes/anggota')
-const paketRoutes      = require('./routes/paket')
-const pembayaranRoutes = require('./routes/pembayaran')
-
+const authRoutes           = require('./routes/auth')
+const anggotaRoutes        = require('./routes/anggota')
+const paketRoutes          = require('./routes/paket')
+const pembayaranRoutes     = require('./routes/pembayaran')
+const tabunganBebasRoutes  = require('./routes/tabunganBebas')
 // Init
 const app  = express()
 const PORT = process.env.PORT ?? 5000
-
 // Middleware (tanpa connectDB dulu)
 app.use(helmet())
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'))
@@ -24,7 +22,6 @@ app.use(cors({
   credentials: true,
 }))
 app.use(express.json())
-
 // Health check
 app.get('/health', async (_, res) => {
   try {
@@ -49,21 +46,18 @@ app.get('/health', async (_, res) => {
     })
   }
 })
-
 // API Routes
-app.use('/api/auth',        authRoutes)
-app.use('/api/anggota',     anggotaRoutes)
-app.use('/api/paket',       paketRoutes)
-app.use('/api/pembayaran',  pembayaranRoutes)
-
+app.use('/api/auth',           authRoutes)
+app.use('/api/anggota',        anggotaRoutes)
+app.use('/api/paket',          paketRoutes)
+app.use('/api/pembayaran',     pembayaranRoutes)
+app.use('/api/tabungan-bebas', tabunganBebasRoutes)
 // 404
 app.use((req, res) => {
   res.status(404).json({ success: false, message: `Route ${req.originalUrl} tidak ditemukan.` })
 })
-
 // Error handler
 app.use(errorHandler)
-
 // Koneksi DB untuk Vercel (dipanggil saat pertama kali request)
 let dbConnected = false
 const ensureDbConnection = async () => {
@@ -72,7 +66,6 @@ const ensureDbConnection = async () => {
     dbConnected = true
   }
 }
-
 // Wrapper untuk Vercel
 const handler = async (req, res) => {
   try {
@@ -87,7 +80,6 @@ const handler = async (req, res) => {
     })
   }
 }
-
 // Untuk development
 if (process.env.NODE_ENV !== 'production') {
   connectDB().then(() => {
@@ -96,6 +88,5 @@ if (process.env.NODE_ENV !== 'production') {
     })
   })
 }
-
 // Export untuk Vercel
 module.exports = handler
