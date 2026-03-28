@@ -24,19 +24,30 @@ app.use(cors({
 }))
 app.use(express.json())
 
-// Root
+// Root & Health
 app.get('/', (_, res) => {
   res.json({ status: 'ok', app: 'pilar-api', time: new Date().toISOString() })
 })
 
-// Health check
 app.get('/health', (_, res) => {
-  res.json({
-    status: 'ok',
-    app: 'pilar-api',
-    env: process.env.NODE_ENV,
-    time: new Date().toISOString(),
-  })
+  res.json({ status: 'ok', app: 'pilar-api', env: process.env.NODE_ENV, time: new Date().toISOString() })
+})
+
+// Temporary seed endpoint — Move to top
+app.get(['/seed', '/api/seed'], async (req, res) => {
+  try {
+    const bcrypt = require('bcryptjs')
+    const User = require('./src/models/User')
+    
+    const existing = await User.countDocuments()
+    if (existing > 0) return res.json({ success: true, message: `${existing} users already exist.` })
+    
+    await User.insertMany([
+      { username: 'admin', password: await bcrypt.hash('pilar2025', 12), nama: 'Administrator', role: 'admin' },
+      { username: 'operator', password: await bcrypt.hash('op1234', 12), nama: 'Operator', role: 'operator' }
+    ])
+    res.json({ success: true, message: 'Users created: admin/pilar2025, operator/op1234' })
+  } catch (err) { res.status(500).json({ success: false, message: err.message }) }
 })
 
 // API Routes
@@ -46,33 +57,10 @@ app.use('/api/paket', paketRoutes)
 app.use('/api/pembayaran', pembayaranRoutes)
 app.use('/api/tabungan-bebas', tabunganBebasRoutes)
 
-// Temporary seed endpoint — REMOVE after first use
-app.get(['/seed', '/api/seed'], async (req, res) => {
-  try {
-    const bcrypt = require('bcryptjs')
-    const User = require('./src/models/User')
-    
-    // Check if users already exist
-    const existing = await User.countDocuments()
-    if (existing > 0) {
-      return res.json({ success: true, message: `Already seeded. ${existing} users exist.` })
-    }
-    
-    const users = [
-      { username: 'admin', password: await bcrypt.hash('pilar2025', 12), nama: 'Administrator', role: 'admin' },
-      { username: 'operator', password: await bcrypt.hash('op1234', 12), nama: 'Operator', role: 'operator' },
-    ]
-    await User.insertMany(users)
-    
-    res.json({ success: true, message: '2 users created: admin/pilar2025, operator/op1234' })
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message })
-  }
-})
-
 // 404
 app.use((req, res) => {
-  res.status(404).json({ success: false, message: `Route ${req.originalUrl} tidak ditemukan.` })
+  console.log('404 on path:', req.originalUrl || req.url)
+  res.status(404).json({ success: false, message: `Route ${req.originalUrl || req.url} tidak ditemukan.` })
 })
 
 app.use(errorHandler)
