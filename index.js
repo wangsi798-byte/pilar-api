@@ -27,22 +27,32 @@ app.use(express.json())
 // Root & Health
 app.get('/', async (req, res) => {
   const time = new Date().toISOString()
+  const uriExists = !!process.env.MONGODB_URI
+  const uriPrefix = uriExists ? process.env.MONGODB_URI.substring(0, 15) + '...' : 'MISSING'
+  
   try {
-    const bcrypt = require('bcryptjs')
+    const mongoose = require('mongoose')
+    const connectDB = require('./src/config/db')
+    
+    // Ensure connection
+    if (mongoose.connection.readyState !== 1) {
+      await connectDB()
+    }
+
     const User = require('./src/models/User')
     const existing = await User.countDocuments()
     
     if (existing > 0) {
-      return res.json({ status: 'ok', app: 'pilar-api', time, seeded: true, users: existing })
+      return res.json({ status: 'ok', app: 'pilar-api', time, db: 'connected', uri: uriPrefix, seeded: true, users: existing })
     }
     
     await User.insertMany([
-      { username: 'admin', password: await bcrypt.hash('pilar2025', 12), nama: 'Administrator', role: 'admin' },
-      { username: 'operator', password: await bcrypt.hash('op1234', 12), nama: 'Operator', role: 'operator' }
+      { username: 'admin', password: await require('bcryptjs').hash('pilar2025', 12), nama: 'Administrator', role: 'admin' },
+      { username: 'operator', password: await require('bcryptjs').hash('op1234', 12), nama: 'Operator', role: 'operator' }
     ])
-    res.json({ status: 'ok', app: 'pilar-api', time, seeded: 'just now' })
+    res.json({ status: 'ok', app: 'pilar-api', time, db: 'connected', uri: uriPrefix, seeded: 'just now' })
   } catch (err) {
-    res.json({ status: 'ok', app: 'pilar-api', time, seedError: err.message })
+    res.json({ status: 'ok', app: 'pilar-api', time, db: 'failed', uri: uriPrefix, seedError: err.message })
   }
 })
 
