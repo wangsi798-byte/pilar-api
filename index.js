@@ -24,35 +24,41 @@ app.use(cors({
 }))
 app.use(express.json())
 
+// DB Connection Middleware for Vercel
+let isConnected = false
+app.use(async (req, res, next) => {
+  if (!isConnected) {
+    try {
+      await connectDB()
+      isConnected = true
+    } catch (err) {
+      console.error('DB Connection Error:', err)
+    }
+  }
+  next()
+})
+
 // Root & Health
 app.get('/', async (req, res) => {
   const time = new Date().toISOString()
-  const uriExists = !!process.env.MONGODB_URI
-  const uriPrefix = uriExists ? process.env.MONGODB_URI.substring(0, 15) + '...' : 'MISSING'
+  const uri = process.env.MONGODB_URI ? 'SET' : 'MISSING'
   
   try {
-    const mongoose = require('mongoose')
-    const connectDB = require('./src/config/db')
-    
-    // Ensure connection
-    if (mongoose.connection.readyState !== 1) {
-      await connectDB()
-    }
-
     const User = require('./src/models/User')
     const existing = await User.countDocuments()
     
     if (existing > 0) {
-      return res.json({ status: 'ok', app: 'pilar-api', time, db: 'connected', uri: uriPrefix, seeded: true, users: existing })
+      return res.json({ status: 'ok', app: 'pilar-api', time, db: 'connected', uri, seeded: true, users: existing })
     }
     
+    const bcrypt = require('bcryptjs')
     await User.insertMany([
-      { username: 'admin', password: await require('bcryptjs').hash('pilar2025', 12), nama: 'Administrator', role: 'admin' },
-      { username: 'operator', password: await require('bcryptjs').hash('op1234', 12), nama: 'Operator', role: 'operator' }
+      { username: 'admin', password: await bcrypt.hash('pilar2025', 12), nama: 'Administrator', role: 'admin' },
+      { username: 'operator', password: await bcrypt.hash('op1234', 12), nama: 'Operator', role: 'operator' }
     ])
-    res.json({ status: 'ok', app: 'pilar-api', time, db: 'connected', uri: uriPrefix, seeded: 'just now' })
+    res.json({ status: 'ok', app: 'pilar-api', time, db: 'connected', uri, seeded: 'just now' })
   } catch (err) {
-    res.json({ status: 'ok', app: 'pilar-api', time, db: 'failed', uri: uriPrefix, seedError: err.message })
+    res.json({ status: 'ok', app: 'pilar-api', time, db: 'failed', uri, seedError: err.message })
   }
 })
 
@@ -63,10 +69,11 @@ app.get('/health', (_, res) => {
 // Alternative seed endpoints
 const seedHandler = async (req, res) => {
   try {
-    const bcrypt = require('bcryptjs')
     const User = require('./src/models/User')
     const existing = await User.countDocuments()
     if (existing > 0) return res.json({ success: true, message: `${existing} users exist.` })
+    
+    const bcrypt = require('bcryptjs')
     await User.insertMany([
       { username: 'admin', password: await bcrypt.hash('pilar2025', 12), nama: 'Administrator', role: 'admin' },
       { username: 'operator', password: await bcrypt.hash('op1234', 12), nama: 'Operator', role: 'operator' }
@@ -87,32 +94,19 @@ app.use('/api/tabungan-bebas', tabunganBebasRoutes)
 
 // 404
 app.use((req, res) => {
-  console.log('404 on path:', req.originalUrl || req.url)
   res.status(404).json({ success: false, message: `Route ${req.originalUrl || req.url} tidak ditemukan.` })
 })
 
 app.use(errorHandler)
 
-// Koneksi DB
-let dbConnected = false
-const ensureDbConnection = async () => {
-  if (!dbConnected) {
-    await connectDB()
-    dbConnected = true
-  }
+// Untuk development
+if (process.env.NODE_ENV !== 'production') {
+  const PORT = process.env.PORT || 5000
+  connectDB().then(() => {
+    app.listen(PORT, () => {
+      console.log(`🚀 Pilar API berjalan di port ${PORT} [${process.env.NODE_ENV ?? 'development'}]`)
+    })
+  })
 }
 
-// Handler untuk Vercel
-module.exports = async (req, res) => {
-  try {
-    await ensureDbConnection()
-    await app(req, res)
-  } catch (error) {
-    console.error('Error:', error)
-    res.status(500).json({ 
-      success: false, 
-      message: 'Server error',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
-    })
-  }
-}
+module.exports = app
