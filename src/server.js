@@ -17,49 +17,71 @@ const tabunganBebasRoutes = require('./routes/tabunganBebas')
 const app  = express()
 const PORT = process.env.PORT ?? 5000
 
-// Middleware (tanpa connectDB dulu)
-app.use(helmet())
-app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'))
-app.use(cors({
-  origin: true,
+// Middleware
+const corsOrg = require('cors')
+app.use(corsOrg({
+  origin: [
+    'https://pilar2.vercel.app',
+    'https://pilar2-qqqoy5qgy-wangsi798-bytes-projects.vercel.app',
+    'http://localhost:5173',
+    'http://localhost:3000'
+  ],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
 }))
+
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" }
+}))
+app.use(morgan('dev'))
 app.use(express.json())
 
 // DB Connection Middleware for Vercel
 let isConnected = false
 app.use(async (req, res, next) => {
-  if (!isConnected) {
-    try {
-      const connectDB = require('./config/db')
-      await connectDB()
-      isConnected = true
-    } catch (err) {
-      console.error('DB Connection Error:', err)
-    }
+  if (req.path === '/' || req.path === '/health') return next()
+  if (isConnected) return next()
+  try {
+    const connectDB = require('./config/db')
+    await connectDB()
+    isConnected = true
+    next()
+  } catch (err) {
+    console.error('DB middleware error:', err.message)
+    next()
   }
-  next()
 })
 
 // Root & Health
 app.get('/', async (req, res) => {
   const time = new Date().toISOString()
-  const uri = process.env.MONGODB_URI ? 'SET' : 'MISSING'
   try {
     const User = require('./models/User')
-    const existing = await User.countDocuments()
-    if (existing > 0) return res.json({ status: 'ok', app: 'pilar-api', time, db: 'connected', uri, seeded: true, users: existing })
+    const count = await User.countDocuments().catch(() => -1)
+    if (count < 0) {
+      const connectDB = require('./config/db')
+      await connectDB().catch(() => {})
+    }
+    const finalCount = await User.countDocuments().catch(() => 0)
+    
+    if (finalCount > 0) {
+      return res.json({ status: 'ok', app: 'pilar-api', time, db: 'connected', seeded: true, users: finalCount })
+    }
+    
     const bcrypt = require('bcryptjs')
     await User.insertMany([
       { username: 'admin', password: await bcrypt.hash('pilar2025', 12), nama: 'Administrator', role: 'admin' },
       { username: 'operator', password: await bcrypt.hash('op1234', 12), nama: 'Operator', role: 'operator' }
     ])
-    res.json({ status: 'ok', app: 'pilar-api', time, db: 'connected', uri, seeded: 'just now' })
-  } catch (err) { res.json({ status: 'ok', app: 'pilar-api', time, db: 'failed', uri, seedError: err.message }) }
+    res.json({ status: 'ok', app: 'pilar-api', time, db: 'connected', seeded: 'just now' })
+  } catch (err) {
+    res.json({ status: 'ok', app: 'pilar-api', time, seedError: err.message })
+  }
 })
 
 app.get('/health', (_, res) => {
-  res.json({ status: 'ok', app: 'pilar-api', env: process.env.NODE_ENV, time: new Date().toISOString() })
+  res.json({ status: 'ok', app: 'pilar-api', time: new Date().toISOString() })
 })
 
 // Alternative seed endpoints
@@ -88,7 +110,7 @@ app.use('/api/tabungan-bebas', tabunganBebasRoutes)
 
 // 404
 app.use((req, res) => {
-  res.status(404).json({ success: false, message: `Route ${req.originalUrl} tidak ditemukan.` })
+  res.status(404).json({ success: false, message: `Route ${req.originalUrl || req.url} tidak ditemukan.` })
 })
 
 // Error handler

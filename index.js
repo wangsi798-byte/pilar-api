@@ -1,8 +1,9 @@
 require('dotenv').config()
 const express = require('express')
-const cors = require('cors')
+const cors = require('express-cors') // Simplified CORS or similar
 const helmet = require('helmet')
 const morgan = require('morgan')
+const corsOrg = require('cors')
 const connectDB = require('./src/config/db')
 const errorHandler = require('./src/middleware/errorHandler')
 
@@ -16,39 +17,53 @@ const tabunganBebasRoutes = require('./src/routes/tabunganBebas')
 const app = express()
 
 // Middleware
-app.use(helmet())
-app.use(morgan('dev'))
-app.use(cors({
-  origin: true,
+app.use(corsOrg({
+  origin: [
+    'https://pilar2.vercel.app',
+    'https://pilar2-qqqoy5qgy-wangsi798-bytes-projects.vercel.app',
+    'http://localhost:5173',
+    'http://localhost:3000'
+  ],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
 }))
+
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" }
+}))
+app.use(morgan('dev'))
 app.use(express.json())
 
 // DB Connection Middleware for Vercel
 let isConnected = false
 app.use(async (req, res, next) => {
-  if (!isConnected) {
-    try {
-      await connectDB()
-      isConnected = true
-    } catch (err) {
-      console.error('DB Connection Error:', err)
-    }
+  if (req.path === '/' || req.path === '/health') return next()
+  if (isConnected) return next()
+  try {
+    await connectDB()
+    isConnected = true
+    next()
+  } catch (err) {
+    console.error('DB middleware error:', err.message)
+    next()
   }
-  next()
 })
 
 // Root & Health
 app.get('/', async (req, res) => {
   const time = new Date().toISOString()
-  const uri = process.env.MONGODB_URI ? 'SET' : 'MISSING'
-  
   try {
     const User = require('./src/models/User')
-    const existing = await User.countDocuments()
+    const count = await User.countDocuments().catch(() => -1)
+    if (count < 0) {
+      // Direct connect attempt for debugging
+      await connectDB().catch(() => {})
+    }
+    const finalCount = await User.countDocuments().catch(() => 0)
     
-    if (existing > 0) {
-      return res.json({ status: 'ok', app: 'pilar-api', time, db: 'connected', uri, seeded: true, users: existing })
+    if (finalCount > 0) {
+      return res.json({ status: 'ok', app: 'pilar-api', time, db: 'connected', seeded: true, users: finalCount })
     }
     
     const bcrypt = require('bcryptjs')
@@ -56,14 +71,14 @@ app.get('/', async (req, res) => {
       { username: 'admin', password: await bcrypt.hash('pilar2025', 12), nama: 'Administrator', role: 'admin' },
       { username: 'operator', password: await bcrypt.hash('op1234', 12), nama: 'Operator', role: 'operator' }
     ])
-    res.json({ status: 'ok', app: 'pilar-api', time, db: 'connected', uri, seeded: 'just now' })
+    res.json({ status: 'ok', app: 'pilar-api', time, db: 'connected', seeded: 'just now' })
   } catch (err) {
-    res.json({ status: 'ok', app: 'pilar-api', time, db: 'failed', uri, seedError: err.message })
+    res.json({ status: 'ok', app: 'pilar-api', time, seedError: err.message })
   }
 })
 
 app.get('/health', (_, res) => {
-  res.json({ status: 'ok', app: 'pilar-api', env: process.env.NODE_ENV, time: new Date().toISOString() })
+  res.json({ status: 'ok', app: 'pilar-api', time: new Date().toISOString() })
 })
 
 // Alternative seed endpoints
@@ -72,7 +87,6 @@ const seedHandler = async (req, res) => {
     const User = require('./src/models/User')
     const existing = await User.countDocuments()
     if (existing > 0) return res.json({ success: true, message: `${existing} users exist.` })
-    
     const bcrypt = require('bcryptjs')
     await User.insertMany([
       { username: 'admin', password: await bcrypt.hash('pilar2025', 12), nama: 'Administrator', role: 'admin' },
@@ -98,15 +112,5 @@ app.use((req, res) => {
 })
 
 app.use(errorHandler)
-
-// Untuk development
-if (process.env.NODE_ENV !== 'production') {
-  const PORT = process.env.PORT || 5000
-  connectDB().then(() => {
-    app.listen(PORT, () => {
-      console.log(`🚀 Pilar API berjalan di port ${PORT} [${process.env.NODE_ENV ?? 'development'}]`)
-    })
-  })
-}
 
 module.exports = app
