@@ -47,7 +47,7 @@ app.use('/api/pembayaran', pembayaranRoutes)
 app.use('/api/tabungan-bebas', tabunganBebasRoutes)
 
 // Temporary seed endpoint — REMOVE after first use
-app.get('/api/seed', async (req, res) => {
+app.get(['/seed', '/api/seed'], async (req, res) => {
   try {
     const bcrypt = require('bcryptjs')
     const User = require('./src/models/User')
