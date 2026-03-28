@@ -5,15 +5,13 @@ const helmet = require('helmet')
 const morgan = require('morgan')
 const connectDB = require('../src/config/db')
 const errorHandler = require('../src/middleware/errorHandler')
-
 // Routes
-const authRoutes = require('../src/routes/auth')
-const anggotaRoutes = require('../src/routes/anggota')
-const paketRoutes = require('../src/routes/paket')
-const pembayaranRoutes = require('../src/routes/pembayaran')
-
+const authRoutes           = require('../src/routes/auth')
+const anggotaRoutes        = require('../src/routes/anggota')
+const paketRoutes          = require('../src/routes/paket')
+const pembayaranRoutes     = require('../src/routes/pembayaran')
+const tabunganBebasRoutes  = require('../src/routes/tabunganBebas')
 const app = express()
-
 // Middleware
 app.use(helmet())
 app.use(morgan('dev'))
@@ -22,7 +20,6 @@ app.use(cors({
   credentials: true,
 }))
 app.use(express.json())
-
 // Health check
 app.get('/health', (_, res) => {
   res.json({
@@ -32,20 +29,17 @@ app.get('/health', (_, res) => {
     time: new Date().toISOString(),
   })
 })
-
 // API Routes
-app.use('/api/auth', authRoutes)
-app.use('/api/anggota', anggotaRoutes)
-app.use('/api/paket', paketRoutes)
-app.use('/api/pembayaran', pembayaranRoutes)
-
+app.use('/api/auth',           authRoutes)
+app.use('/api/anggota',        anggotaRoutes)
+app.use('/api/paket',          paketRoutes)
+app.use('/api/pembayaran',     pembayaranRoutes)
+app.use('/api/tabungan-bebas', tabunganBebasRoutes)
 // 404
 app.use((req, res) => {
   res.status(404).json({ success: false, message: `Route ${req.originalUrl} tidak ditemukan.` })
 })
-
 app.use(errorHandler)
-
 // Koneksi DB
 let dbConnected = false
 const ensureDbConnection = async () => {
@@ -54,7 +48,6 @@ const ensureDbConnection = async () => {
     dbConnected = true
   }
 }
-
 // Handler untuk Vercel
 module.exports = async (req, res) => {
   try {
