@@ -18,8 +18,7 @@ const app  = express()
 const PORT = process.env.PORT ?? 5000
 
 // Middleware
-const corsOrg = require('cors')
-app.use(corsOrg({
+app.use(cors({
   origin: [
     'https://pilar2.vercel.app',
     'https://pilar2-qqqoy5qgy-wangsi798-bytes-projects.vercel.app',
@@ -150,4 +149,4 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 // Export untuk Vercel
-module.exports = handler
+module.exports = app

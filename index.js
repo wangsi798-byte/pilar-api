@@ -1,9 +1,8 @@
 require('dotenv').config()
 const express = require('express')
-const cors = require('express-cors') // Simplified CORS or similar
+const cors = require('cors')
 const helmet = require('helmet')
 const morgan = require('morgan')
-const corsOrg = require('cors')
 const connectDB = require('./src/config/db')
 const errorHandler = require('./src/middleware/errorHandler')
 
@@ -17,7 +16,7 @@ const tabunganBebasRoutes = require('./src/routes/tabunganBebas')
 const app = express()
 
 // Middleware
-app.use(corsOrg({
+app.use(cors({
   origin: [
     'https://pilar2.vercel.app',
     'https://pilar2-qqqoy5qgy-wangsi798-bytes-projects.vercel.app',
